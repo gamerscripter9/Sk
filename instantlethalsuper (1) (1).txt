@@ -4067,171 +4067,41 @@ Content:Input({   -- or :TextInput if your WindUI fork prefers that name
 
 })
 
---// ===============================
---// INSTANT LETHAL TAB
+ 
+        --// ===============================
+--// INSTANT LETHAL TAB (minimal version)
 --// ===============================
 
 local InstantLethalTab = Window:Tab({
     Title = "Instant Lethal",
-    Icon = "zap",   -- or "lightning", "bolt", whatever fits your icon set
+    Icon = "zap",   -- feel free to change icon
 })
 
--- ========================
--- INSTANT LETHAL SETTINGS
--- ========================
-local InstantLethalEnabled = false
-local jumpPowerBoost = 65           -- default value
-local animationId = "12296113986"   -- Lethal animation
-local delayBeforeCombo = 1.62
-
-local connection_Animation     -- will store the AnimationPlayed connection
-local connection_CharacterAdded -- will store the CharacterAdded connection
-
--- ========================
--- CORE FUNCTIONS
--- ========================
-local function getRootPart(char)
-    if not char then return nil end
-    return char:FindFirstChild("HumanoidRootPart")
-        or char:FindFirstChild("UpperTorso")
-        or char:FindFirstChild("Torso")
-end
-
-local function boostJumpHeight(char)
-    local root = getRootPart(char)
-    if root then
-        root.Velocity = Vector3.new(root.Velocity.X, jumpPowerBoost, root.Velocity.Z)
-    end
-end
-
-local function rotateCamera180()
-    local cf = workspace.CurrentCamera.CFrame
-    local look = cf.LookVector
-    workspace.CurrentCamera.CFrame = CFrame.new(cf.Position, cf.Position + Vector3.new(-look.X, look.Y, -look.Z))
-end
-
-local function sendDash(char)
-    local communicate = char:FindFirstChild("Communicate")
-    if not communicate then return end
-
-    local args = {{
-        Dash = Enum.KeyCode.W,
-        Key = Enum.KeyCode.Q,
-        Goal = "KeyPress"
-    }}
-
-    pcall(function()
-        communicate:FireServer(unpack(args))
-    end)
-end
-
-local function onAnimationPlayed(track)
-    if not InstantLethalEnabled then return end
-
-    local anim = track.Animation
-    if not anim then return end
-
-    local id = anim.AnimationId:match("%d+")
-    if id ~= animationId then return end
-
-    task.spawn(function()
-        task.wait(delayBeforeCombo)
-
-        local char = LocalPlayer.Character
-        if not char then return end
-
-        -- Triple dash
-        sendDash(char)
-        task.wait(0.06)
-        sendDash(char)
-        task.wait(0.06)
-        sendDash(char)
-
-        -- Boost
-        boostJumpHeight(char)
-
-        -- Camera flip a bit later
-        task.wait(0.3)
-        rotateCamera180()
-    end)
-end
-
-local function setupInstantLethal(char)
-    -- Clean up old connection if exists
-    if connection_Animation then
-        connection_Animation:Disconnect()
-        connection_Animation = nil
-    end
-
-    local humanoid = char:WaitForChild("Humanoid", 5)
-    if not humanoid then return end
-
-    connection_Animation = humanoid.AnimationPlayed:Connect(onAnimationPlayed)
-end
-
-local function enableInstantLethal()
-    if InstantLethalEnabled then return end
-    InstantLethalEnabled = true
-
-    -- Current character
-    if LocalPlayer.Character then
-        setupInstantLethal(LocalPlayer.Character)
-    end
-
-    -- Future respawns
-    connection_CharacterAdded = LocalPlayer.CharacterAdded:Connect(function(char)
-        task.wait(0.4) -- small delay to let character fully load
-        setupInstantLethal(char)
-    end)
-
-    print("[Corex Hub] Instant Lethal → ENABLED")
-end
-
-local function disableInstantLethal()
-    if not InstantLethalEnabled then return end
-    InstantLethalEnabled = false
-
-    if connection_Animation then
-        connection_Animation:Disconnect()
-        connection_Animation = nil
-    end
-
-    if connection_CharacterAdded then
-        connection_CharacterAdded:Disconnect()
-        connection_CharacterAdded = nil
-    end
-
-    print("[Corex Hub] Instant Lethal → DISABLED")
-end
-
--- ========================
--- UI ELEMENTS
--- ========================
+local InstantLethalLoaded = false
 
 InstantLethalTab:Toggle({
     Title = "Instant Lethal",
-    Desc = "Auto triple dash + jump + camera flip after Lethal animation",
+    Desc = "Loads the instant lethal script",
     Value = false,
     Callback = function(state)
-        if state then
-            enableInstantLethal()
-        else
-            disableInstantLethal()
-        end
-    end
-})
-
-InstantLethalTab:Input({
-    Title = "Jump Height",
-    Value = tostring(jumpPowerBoost),
-    Placeholder = "e.g. 65, 80, 100",
-    Callback = function(value)
-        local num = tonumber(value)
-        if num and num > 0 then
-            jumpPowerBoost = num
-            print("[Instant Lethal] Jump boost set to: " .. jumpPowerBoost)
-        else
-            warn("[Instant Lethal] Invalid jump height: " .. tostring(value))
+        if state and not InstantLethalLoaded then
+            InstantLethalLoaded = true
+            
+            local success, err = pcall(function()
+                loadstring(game:HttpGet("https://pastebin.com/raw/g9fRtRiv"))()
+            end)
+            
+            if success then
+                print("[Corex Hub] Instant Lethal script loaded successfully")
+            else
+                warn("[Corex Hub] Failed to load Instant Lethal: " .. tostring(err))
+                InstantLethalLoaded = false  -- allow retry if it failed
+            end
+        elseif not state then
+            -- Most external scripts don't support clean disable
+            -- So we just show a message (you can remove this print if you want)
+            print("[Corex Hub] Instant Lethal turned off (most features will stay until respawn)")
+            -- No real cleanup possible without knowing what the script does
         end
     end
 })
